@@ -1,0 +1,228 @@
+// Prisma Schema - 绩效评估系统数据库模型
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ============ 现有表（改造） ============
+
+model Employee {
+  id         Int      @id @default(autoincrement())
+  empNo      String   @unique @db.VarChar(20)
+  name       String   @db.VarChar(50)
+  position   String?  @db.VarChar(50)
+  station    String?  @db.VarChar(50)
+  area       String?  @db.VarChar(50)
+  workshop   String?  @db.VarChar(50)
+  center     String?  @db.VarChar(50)
+  company    String?  @db.VarChar(50)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  
+  // 关联关系
+  user       User?
+  records    Record[]
+  appeals    Appeal[]
+  
+  @@index([empNo])
+  @@index([area])
+  @@index([workshop])
+  @@index([center])
+  @@map("employees")
+}
+
+model Item {
+  id          Int      @id @default(autoincrement())
+  center      String   @db.VarChar(50)
+  company     String?  @db.VarChar(50)
+  department  String?  @db.VarChar(50)
+  paperCode   String?  @db.VarChar(50)
+  itemCode    String   @unique @db.VarChar(50)
+  name        String   @db.VarChar(200)
+  category    String?  @db.VarChar(50)
+  score       Float
+  description String?  @db.Text
+  status      String   @default("启用") @db.VarChar(20)
+  groupName   String?  @db.VarChar(100)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // 关联关系
+  records     Record[]
+  
+  @@index([center])
+  @@index([itemCode])
+  @@index([status])
+  @@map("items")
+}
+
+model Record {
+  id        Int      @id @default(autoincrement())
+  empNo     String   @db.VarChar(20)
+  itemCode  String?  @db.VarChar(50)
+  year      Int
+  month     Int      @db.TinyInt
+  score     Float
+  remarks   String?  @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // 关联关系
+  employee  Employee @relation(fields: [empNo], references: [empNo], onDelete: Cascade)
+  item      Item?    @relation(fields: [itemCode], references: [itemCode], onDelete: Restrict)
+  appeals   Appeal[]
+  
+  @@index([empNo])
+  @@index([itemCode])
+  @@index([year, month])
+  @@map("records")
+}
+
+// ============ 新增表 ============
+
+model User {
+  id            Int      @id @default(autoincrement())
+  empNo         String   @unique @db.VarChar(20)
+  username      String   @unique @db.VarChar(50)
+  passwordHash  String   @db.VarChar(255)
+  role          Role     @default(EMPLOYEE)
+  scopeArea     String?  @db.VarChar(50)
+  scopeWorkshop String?  @db.VarChar(50)
+  scopeCenter   String?  @db.VarChar(50)
+  lastLogin     DateTime?
+  refreshToken  String?  @db.VarChar(500)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // 关联关系
+  employee              Employee       @relation(fields: [empNo], references: [empNo], onDelete: Cascade)
+  sentNotifications     Notification[] @relation("Sender")
+  receivedNotifications Notification[] @relation("Recipient")
+  auditLogs             AuditLog[]
+  processedAppeals      Appeal[]       @relation("Processor")
+  
+  @@index([empNo])
+  @@index([username])
+  @@index([role])
+  @@map("users")
+}
+
+enum Role {
+  EMPLOYEE
+  AREA_ADMIN
+  WORKSHOP_ADMIN
+  CENTER_ADMIN
+  SUPER_ADMIN
+}
+
+model Notification {
+  id          Int              @id @default(autoincrement())
+  recipientNo String           @db.VarChar(20)
+  senderNo    String?          @db.VarChar(20)
+  type        NotificationType
+  title       String           @db.VarChar(200)
+  content     String           @db.Text
+  relatedId   Int?
+  isRead      Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+  
+  // 关联关系
+  recipient   User             @relation("Recipient", fields: [recipientNo], references: [empNo], onDelete: Cascade)
+  sender      User?            @relation("Sender", fields: [senderNo], references: [empNo], onDelete: SetNull)
+  
+  @@index([recipientNo, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+enum NotificationType {
+  APPEAL_SUBMITTED
+  APPEAL_PROCESSED
+  TRANSFER_NOTIFY
+  RECORD_CHANGED
+  ROLE_CHANGED
+}
+
+model Appeal {
+  id           Int            @id @default(autoincrement())
+  empNo        String         @db.VarChar(20)
+  recordId     Int
+  year         Int
+  month        Int            @db.TinyInt
+  reason       String         @db.Text
+  status       AppealStatus   @default(PENDING)
+  submittedAt  DateTime       @default(now())
+  processedAt  DateTime?
+  processorNo  String?        @db.VarChar(20)
+  response     String?        @db.Text
+  
+  // 关联关系
+  employee     Employee       @relation(fields: [empNo], references: [empNo], onDelete: Cascade)
+  record       Record         @relation(fields: [recordId], references: [id], onDelete: Cascade)
+  processor    User?          @relation("Processor", fields: [processorNo], references: [empNo], onDelete: SetNull)
+  history      AppealHistory[]
+  
+  @@index([empNo])
+  @@index([status])
+  @@index([year, month])
+  @@map("appeals")
+}
+
+enum AppealStatus {
+  PENDING
+  PROCESSING
+  APPROVED
+  REJECTED
+}
+
+model AppealHistory {
+  id        Int      @id @default(autoincrement())
+  appealId  Int
+  action    String   @db.VarChar(50)
+  operator  String   @db.VarChar(20)
+  details   String?  @db.Text
+  timestamp DateTime @default(now())
+  
+  // 关联关系
+  appeal    Appeal   @relation(fields: [appealId], references: [id], onDelete: Cascade)
+  
+  @@index([appealId])
+  @@map("appeal_history")
+}
+
+model AppealSettings {
+  id        Int      @id @default(autoincrement())
+  year      Int
+  month     Int      @db.TinyInt
+  deadline  DateTime
+  isOpen    Boolean  @default(true)
+  createdBy String   @db.VarChar(20)
+  createdAt DateTime @default(now())
+  
+  @@unique([year, month])
+  @@index([year, month])
+  @@map("appeal_settings")
+}
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  operatorNo  String   @db.VarChar(20)
+  actionType  String   @db.VarChar(50)
+  targetType  String   @db.VarChar(50)
+  targetId    String   @db.VarChar(50)
+  details     Json?
+  ipAddress   String?  @db.VarChar(45)
+  timestamp   DateTime @default(now())
+  
+  // 关联关系
+  operator    User     @relation(fields: [operatorNo], references: [empNo], onDelete: Cascade)
+  
+  @@index([operatorNo])
+  @@index([actionType])
+  @@index([timestamp])
+  @@map("audit_logs")
+}
