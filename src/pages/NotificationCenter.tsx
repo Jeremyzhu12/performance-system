@@ -78,7 +78,7 @@ const NotificationCenter: React.FC = () => {
     // 标记单条为已读
     const markAsRead = async (id: number) => {
         try {
-            await api.put(`/notifications/${id}/read`)
+            await api.post(`/notifications/${id}/read`)
             setNotifications(prev =>
                 prev.map(n => n.id === id ? { ...n, isRead: true } : n)
             )
@@ -91,7 +91,7 @@ const NotificationCenter: React.FC = () => {
     // 全部标记已读
     const markAllAsRead = async () => {
         try {
-            await api.put('/notifications/read-all')
+            await api.post('/notifications/mark-all-read')
             setNotifications(prev => prev.map(n => ({ ...n, isRead: true })))
             setUnreadCount(0)
             message.success('已全部标记为已读')
