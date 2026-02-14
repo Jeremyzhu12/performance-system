@@ -44,7 +44,7 @@ model Item {
   itemCode    String   @unique @db.VarChar(50)
   name        String   @db.VarChar(200)
   category    String?  @db.VarChar(50)
-  score       Float
+  score       String   @db.VarChar(50)
   description String?  @db.Text
   status      String   @default("启用") @db.VarChar(20)
   groupName   String?  @db.VarChar(100)
