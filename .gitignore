@@ -61,7 +61,7 @@ out
 
 # Nuxt.js build / generate output
 .nuxt
-dist
+# dist  (included for deployment)
 
 # Gatsby files
 .cache/
@@ -92,7 +92,7 @@ logs
 
 # Build outputs
 build/
-dist/
+# dist/  (included for deployment)
 
 # Server
 server/node_modules/
